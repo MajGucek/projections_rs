@@ -28,47 +28,11 @@ pub mod algebra_r3 {
         }
 
         pub fn apply_transform(&self, v: Vector, local_origin: Vector) -> Vector {
-            self.local_transform(
-                v,
-                local_origin,
-                |v| {
-                    self.apply_translation(
-                        self.apply_rotation(
-                            self.apply_scaling(v, local_origin)
-                            , local_origin
-                        ),
-                        local_origin
-                    )
-                }
-            )
-        }
-
-        fn apply_translation(&self, v: Vector, local_origin: Vector) -> Vector {
-            self.local_transform(
-                v,
-                local_origin,
-                |v| {
-                    v.translate(self.translation)
-                }
-            )
-        }
-        fn apply_rotation(&self, v: Vector, local_origin: Vector) -> Vector {
-            self.local_transform(
-                v,
-                local_origin,
-                |v| {
-                    Quaternion::from(v).rotate(self.rotation).into()
-                }
-            )
-        }
-        fn apply_scaling(&self, v: Vector, local_origin: Vector) -> Vector {
-            self.local_transform(
-                v,
-                local_origin,
-                |v| {
+            self.local_transform(v, local_origin, |v| {
+                Quaternion::from(
                     v.scale(self.scale)
-                }
-            )
+                ).rotate(self.rotation).into()
+            }).translate(self.translation)
         }
     }
 

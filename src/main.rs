@@ -138,7 +138,7 @@ impl VirtualSpacePlot {
     ) -> Self {
         Self {
             shapes: vec![
-                Box::new(PlyObject::new("src/apple.ply".to_owned())),
+                Box::new(PlyObject::try_load("src/apple.ply".to_owned()).unwrap()),
             ],
             light,
             ambient_light,
