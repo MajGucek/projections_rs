@@ -7,10 +7,13 @@ pub mod math_lib {
         face.vertices.iter().any(|vector| check_vector_culling(focal_length, vector))
     }
 
-    fn project(focal_length: f32, x_offset: f32, y_offset: f32, zoom: f32, v: &Vector) -> Pos2 {
-        Pos2::new(
-            (v.x * (focal_length / (v.z + focal_length)) * zoom) + x_offset,
-            (v.y * (focal_length / (v.z + focal_length)) * zoom) + y_offset
+    fn project(focal_length: f32, x_offset: f32, y_offset: f32, zoom: f32, v: &Vector) -> (Pos2, f32) {
+        (
+            Pos2::new(
+                (v.x * (focal_length / (v.z + focal_length)) * zoom) + x_offset,
+                (v.y * (focal_length / (v.z + focal_length)) * zoom) + y_offset
+            ),
+            v.z,
         )
     }
 
@@ -83,7 +86,7 @@ pub mod math_lib {
     }
     impl TriFace {
         pub fn calculate_colors(&mut self, light: &Light, ambient_light: f32) {
-            
+
             for i in 0..3 {
                 let base = self.colors[i];
 
@@ -104,19 +107,24 @@ pub mod math_lib {
             }
         }
 
-        pub fn project_to_screen_space(&self, focal_length: f32, x_offset: f32, y_offset: f32, zoom: f32) -> egui::Mesh {
+        pub fn project_to_screen_space(&self, focal_length: f32, x_offset: f32, y_offset: f32, zoom: f32) -> (egui::Mesh, f32) {
             let mut mesh = egui::Mesh::default();
-
+            let mut depth_avg = 0.;
             for i in 0..3 {
+                let (pos2, depth) = project(focal_length, x_offset, y_offset, zoom, &self.vertices[i]);
+                
+                depth_avg += depth;
+
                 mesh.vertices.push(egui::epaint::Vertex {
-                    pos: project(focal_length, x_offset, y_offset, zoom, &self.vertices[i]),
+                    pos: pos2,
                     uv: egui::pos2(0., 0.),
                     color: self.colors[i].into()
                 });
             }
             mesh.indices.extend([0, 1, 2]);
-
-            mesh
+            
+            depth_avg /= 3.;
+            (mesh, depth_avg)    
         }
 
 

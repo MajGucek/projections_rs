@@ -2,6 +2,7 @@ mod math;
 mod ply_parser;
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::f32::consts::PI;
 use std::rc::Rc;
 use std::time::Instant;
@@ -9,6 +10,7 @@ use crate::math::algebra_r3::*;
 use crate::math::raster_lib::math_lib::Shape;
 use eframe::{egui, Frame};
 use egui::Context;
+use egui::emath::OrderedFloat;
 use crate::math::math_lib::Light;
 use crate::ply_parser::PlyObject;
 
@@ -76,9 +78,17 @@ impl eframe::App for App {
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.heading("Settings");
-                    ui.add(egui::Slider::new(&mut *self.zoom.borrow_mut(), 0.1..=2.0).text("Zoom"));
+                    ui.add(egui::Slider::new(&mut *self.zoom.borrow_mut(), 0.05..=2.5).text("Zoom"));
                     ui.add(egui::Slider::new(&mut (*self.light.borrow_mut()).intensity, 0.1..=1.0).text("Light Intensity"));
                     ui.add(egui::Slider::new(&mut *self.ambient_light.borrow_mut(), 0.1..=0.3).text("Ambient Light"));
+                    
+                    ctx.input(|i| {
+                        if i.smooth_scroll_delta.y != 0.0 {
+                            let zoom = *self.zoom.borrow();
+                            *self.zoom.borrow_mut() = (zoom * (1.0 + i.smooth_scroll_delta.y * 0.005)).clamp(0.05, 2.5);
+                        }
+                    });
+
 
                     egui::Frame::new()
                         .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
@@ -183,20 +193,27 @@ impl eframe::App for VirtualSpacePlot {
                 let focal_length = *self.focal_length.borrow();
                 let zoom = *self.zoom.borrow();
 
-                let tris: Vec<egui::Mesh> = self.shapes.iter().flat_map(|shape| {
+                let mut map: BTreeMap<OrderedFloat<f32>, Vec<egui::Mesh>> = BTreeMap::new();
+
+                self.shapes.iter().for_each(|shape| {
                     shape.produce_mesh()
                         .into_iter()
                         .filter(|tri_face| tri_face.check_face_culling(focal_length))
-                        .map(|mut tri_face| {
+                        .for_each(|mut tri_face| {
                             tri_face.calculate_colors(&*self.light.borrow(), *self.ambient_light.borrow_mut());
-                            tri_face.project_to_screen_space(focal_length, x_offset, y_offset, zoom)
+                            let (mesh, depth) = tri_face.project_to_screen_space(focal_length, x_offset, y_offset, zoom);
+
+                            map.entry(OrderedFloat::from(depth)).or_default().push(mesh);
                         })
-                }).collect();
+                });
+
+                map.into_iter().for_each(|(_, meshes)| {
+                    meshes.into_iter().for_each(|mesh| {
+                        let _ = ui.painter().add(egui::Shape::mesh(mesh));
+                    });
+                });
 
 
-                tris.into_iter().for_each(|mesh| {
-                    let _ = ui.painter().add(egui::Shape::mesh(mesh));
-                })
             });
     }
 }
@@ -215,6 +232,3 @@ fn main() {
         Box::new(|cc| Ok(Box::new(App::new(cc))))
     ).unwrap();
 }
-
-
-

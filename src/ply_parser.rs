@@ -71,7 +71,7 @@ impl Shape for PlyObject {
     }
 
     fn produce_mesh(&self) -> Vec<TriFace> {
-        let vertexes = self.transform_vectors(4000.);
+        let vertexes = self.transform_vectors(5000.);
         self.face_indices.iter().map(|idxs| {
             let verts = [vertexes[idxs[0]], vertexes[idxs[1]], vertexes[idxs[2]]];
             let tri = TriFace::from((verts, self.color));
