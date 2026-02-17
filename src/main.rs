@@ -13,12 +13,12 @@ use std::time::Instant;
 use arc_swap::{ArcSwap, ArcSwapAny};
 use crate::math::algebra_r3::*;
 use crate::math::raster_lib::math_lib::Shape;
-use eframe::{egui, Frame};
-use eframe::epaint::Color32;
+use eframe::{egui, emath, Frame};
+use eframe::emath::{Pos2};
+use eframe::epaint::{Color32, StrokeKind};
 use eframe::HardwareAcceleration::Preferred;
-use egui::{Context, Mesh, Rangef};
+use egui::{Context, CornerRadius, Mesh, Rangef, Sense, Stroke, Vec2};
 use egui::emath::OrderedFloat;
-use rand::random;
 use crate::graph::Graph;
 use crate::math::math_lib::Light;
 use crate::ply_parser::PlyObject;
@@ -62,9 +62,11 @@ impl App {
         let ambient_light = Rc::new(RefCell::new(0.1));
 
         let mut pedal_graph= Graph::new(1000);
-        pedal_graph.add_function(Color32::GREEN, 1., false);
-        pedal_graph.add_function(Color32::RED, 1., false);
-        pedal_graph.add_function(Color32::ORANGE, 1., false);
+        pedal_graph.add_function(Color32::GREEN, 1.);
+        pedal_graph.add_function(Color32::RED, 1.);
+        pedal_graph.add_function(Color32::ORANGE, 1.);
+        pedal_graph.add_function(Color32::YELLOW, 1.);
+        pedal_graph.add_function(Color32::GRAY, 1.);
 
         Self {
             rbr_data_handle,
@@ -141,27 +143,92 @@ impl eframe::App for App {
                     }
 
                     ui.add_space(10.);
+                    ui.heading("Pedals");
                     if ui.checkbox(&mut self.reverse_pedal_graph_direction, "Reverse Direction").changed() {
                         self.pedal_graph.reverse_graph_dir();
                     };
-
-                    if !is_valid {
+                    if is_valid {
                         self.pedal_graph.add_point(vec![
-                            random::<f32>() * 120.,
-                            random::<f32>() * 120.,
-                            random::<f32>() * 120.,
-                        ]);
-                    } else {
-                        self.pedal_graph.add_point(vec![
-                           rbr_header.telemetry.control.throttle,
-                           rbr_header.telemetry.control.brake,
-                           rbr_header.telemetry.control.clutch,
+                            rbr_header.telemetry.control.throttle,
+                            rbr_header.telemetry.control.brake,
+                            rbr_header.telemetry.control.clutch,
+                            rbr_header.telemetry.control.handbrake,
+                            rbr_header.telemetry.control.gear as f32,
                         ]);
                     }
-
-
-
                     self.pedal_graph.render(ui, None, 120.);
+
+
+
+                    ui.add_space(10.);
+                    ui.heading("Steering");
+                    egui::Frame::dark_canvas(ui.style())
+                        .show(ui, |ui| {
+                            ui.set_height(200.);
+                            ui.set_width(ui.available_width());
+
+                            let mut angle: f32 = 0.;
+                            if is_valid {
+                                angle = rbr_header.telemetry.control.steering;
+                            }
+
+                            let (_resp, painter)= ui.allocate_painter(Vec2::new(
+                                ui.available_width(),
+                                200.
+                            ), Sense::hover());
+                            let mut center_pos = _resp.rect.center();
+                            center_pos.y -= 25.;
+
+                            let radius = 50.;
+                            let stroke_thickness = 10.;
+                            painter.circle_stroke(
+                                center_pos,
+                                radius,
+                                Stroke::new(stroke_thickness, Color32::GRAY)
+                            );
+                            center_pos.x += (radius + stroke_thickness / 2.) * angle.sin();
+                            center_pos.y += (radius + stroke_thickness / 2.) * -angle.cos();
+                            painter.circle_filled(
+                                center_pos,
+                                stroke_thickness,
+                                Color32::YELLOW,
+                            );
+
+
+                            let margin = 4.;
+                            let hor_center = _resp.rect.center().x;
+                            let rect_width = _resp.rect.width() / 2. - margin;
+                            let rect_height = 20.;
+                            let bottom_pos = _resp.rect.max.y;
+                            painter.rect_stroke(
+                                emath::Rect {
+                                    min: Pos2::new(hor_center - rect_width, bottom_pos - margin - rect_height),
+                                    max: Pos2::new(hor_center, bottom_pos - margin),
+                                },
+                                CornerRadius::same(1),
+                                Stroke::new(
+                                    1.,
+                                    Color32::GRAY,
+                                ),
+                                StrokeKind::Outside,
+                            );
+                            painter.rect_stroke(
+                                emath::Rect {
+                                    min: Pos2::new(hor_center, bottom_pos - margin - rect_height),
+                                    max: Pos2::new(hor_center + rect_width, bottom_pos - margin),
+                                },
+                                CornerRadius::same(1),
+                                Stroke::new(
+                                    1.,
+                                    Color32::GRAY,
+                                ),
+                                StrokeKind::Outside,
+                            );
+
+                            todo!("Implement angle calculation and display the rect_filled()!");
+                        });
+
+
                 });
             });
     }
@@ -193,7 +260,7 @@ impl VirtualSpacePlot {
     ) -> Self {
         Self {
             shapes: vec![
-                Box::new(PlyObject::try_load("src/apple.ply".to_owned()).unwrap()),
+                Box::new(PlyObject::try_load("assets/apple.ply".to_owned()).unwrap()),
             ],
             light,
             ambient_light,
@@ -235,7 +302,7 @@ impl eframe::App for VirtualSpacePlot {
             .frame(egui::Frame::NONE)
             .show(ctx, |ui| {
                 let viewport_rect = ui.max_rect();
-                let _response = ui.allocate_rect(viewport_rect, egui::Sense::click_and_drag());
+                let _response = ui.allocate_rect(viewport_rect, Sense::click_and_drag());
 
                 ui.painter().rect_filled(
                     _response.rect,

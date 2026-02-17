@@ -147,6 +147,7 @@ pub mod math_lib {
 
     pub struct Light {
         pub direction: Vector,
+        #[allow(unused)] // Kind of novelty, pointless
         pub color: RGB,
         pub intensity: f32,
     }

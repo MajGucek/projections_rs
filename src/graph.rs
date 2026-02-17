@@ -17,9 +17,9 @@ struct Function {
 
 
 impl Graph {
-    pub fn render(&self, ui: &mut Ui, width: Option<f32>, height: f32, ) {
+    pub fn render(&self, ui: &mut Ui, width: Option<f32>, height: f32) {
         egui::Frame::dark_canvas(ui.style())
-            .corner_radius(egui::CornerRadius::same(4))
+            .corner_radius(egui::CornerRadius::same(2))
             .show(ui, |ui| {
                 let width = width.unwrap_or(ui.available_width());
                 let (response, painter) = ui.allocate_painter(Vec2::new(
@@ -29,6 +29,7 @@ impl Graph {
 
                 let graph_start_absolute_position_y = response.rect.min.y;
                 let graph_start_absolute_position_x = response.rect.min.x;
+
 
                 self.points.iter().for_each(|function| {
                     function.points.iter().enumerate().for_each(|(index, &p)| {
@@ -53,7 +54,8 @@ impl Graph {
     }
 
     pub fn add_point(&mut self, points: Vec<f32>) {
-        assert_eq!(points.len(), self.points.len());
+        assert_eq!(points.len(), self.points.len(), "Comparing add_point input vector length with how many internal functions are registered!");
+
         points.iter().enumerate().for_each(|(index, point)| {
             self.points[index].points.push_back(*point);
             if self.points[index].points.len() > self.max_points {
@@ -68,12 +70,12 @@ impl Graph {
         });
     }
 
-    pub fn add_function(&mut self, color: Color32, point_size: f32, reverse_direction: bool) {
+    pub fn add_function(&mut self, color: Color32, point_size: f32) {
         self.points.push(Function {
             point_color: color,
             point_size,
             points: VecDeque::with_capacity(self.max_points),
-            reverse_direction,
+            reverse_direction: false,
         });
     }
 

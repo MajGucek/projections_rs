@@ -10,6 +10,7 @@ pub struct PlyObject {
     face_indices: Vec<[usize; 3]>,
     color: RGB,
     transform: Transform,
+    #[allow(unused)] // May come in handy?
     file_name: String,
 }
 
