@@ -2,9 +2,10 @@ mod math;
 mod ply_parser;
 mod rbr;
 mod udp_reader;
+mod graph;
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::f32::consts::PI;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -15,8 +16,11 @@ use crate::math::raster_lib::math_lib::Shape;
 use eframe::{egui, Frame};
 use eframe::epaint::Color32;
 use eframe::HardwareAcceleration::Preferred;
-use egui::{Context, Rangef};
+use egui::{Context, Mesh, Pos2, Rangef, Sense, Ui, Vec2};
 use egui::emath::OrderedFloat;
+use egui::epaint::CircleShape;
+use rand::random;
+use crate::graph::Graph;
 use crate::math::math_lib::Light;
 use crate::ply_parser::PlyObject;
 use crate::rbr::{RbrHeader, Telemetry};
@@ -28,6 +32,9 @@ struct App {
     app_data: AppData,
 
     virtual_space_plot: VirtualSpacePlot,
+    pedal_graph: Graph,
+    reverse_pedal_graph_direction: bool,
+
     last_frame: Instant,
 
     focal_length: Rc<RefCell<f32>>,
@@ -53,6 +60,11 @@ impl App {
         
         let ambient_light = Rc::new(RefCell::new(0.1));
 
+        let mut pedal_graph= Graph::new(1000);
+        pedal_graph.add_function(Color32::GREEN, 1., false);
+        pedal_graph.add_function(Color32::RED, 1., false);
+        pedal_graph.add_function(Color32::ORANGE, 1., false);
+
         Self {
             rbr_data_handle,
             app_data_handle,
@@ -66,6 +78,8 @@ impl App {
                 light.clone(),
                 ambient_light.clone(),
             ),
+            pedal_graph,
+            reverse_pedal_graph_direction: false,
             last_frame: Instant::now(),
             focal_length,
             zoom,
@@ -115,27 +129,45 @@ impl eframe::App for App {
                     if ui.text_edit_singleline(&mut self.app_data.port).changed() {
                         self.app_data_handle.store(Arc::new(self.app_data.clone()));
                     }
-                    
+
+                    let mut is_valid = false;
                     if rbr_header.error.is_none() {
                         ui.colored_label(Color32::LIGHT_GREEN, "Connected to UDP port and reading!");
+                        is_valid = true;
                     } else if !rbr_header.error.clone().unwrap().contains("10035") {
                         ui.colored_label(Color32::RED, rbr_header.error.clone().unwrap());
+                        is_valid = false;
+                    }
+                    
+                    ui.add_space(10.);
+                    if ui.checkbox(&mut self.reverse_pedal_graph_direction, "Reverse Direction").changed() {
+                        self.pedal_graph.reverse_graph_dir();
+                    };
+
+                    if !is_valid {
+                        self.pedal_graph.add_point(vec![
+                            random::<f32>() * 120.,
+                            random::<f32>() * 120.,
+                            random::<f32>() * 120.,
+                        ]);
+                    } else {
+                        self.pedal_graph.add_point(vec![
+                           rbr_header.telemetry.control.throttle,
+                           rbr_header.telemetry.control.brake,
+                           rbr_header.telemetry.control.clutch,
+                        ]);
                     }
 
-                    egui::Frame::new()
-                        .stroke(ui.style().visuals.widgets.noninteractive.bg_stroke)
-                        .corner_radius(egui::CornerRadius::same(4))
-                        .inner_margin(egui::Margin::same(4))
-                        .show(ui, |ui| {
-                            ui.set_min_height(120.0);
-                            ui.set_width(ui.available_width());
 
 
-                        });
+                    self.pedal_graph.render(ui, None, 120.);
                 });
             });
     }
 }
+
+
+
 
 
 struct VirtualSpacePlot {
@@ -179,7 +211,7 @@ impl VirtualSpacePlot {
             Transform {
                 translation: Vector::new(t.cos() * speed / 30., 0., 0.),
                 rotation: Quaternion::new_rotation(speed * t, Vector::new(0., 0., 1.)),
-                scale: Vector::new(1., t.sin(), 1.)
+                scale: Vector::new(1., t.sin().abs().max(0.25), 1.)
             }
         ];
         self.shapes
@@ -229,13 +261,14 @@ impl eframe::App for VirtualSpacePlot {
                         })
                 });
 
+                let mut big_mesh: Mesh = Mesh::default();
                 map.into_iter().for_each(|(_, meshes)| {
                     meshes.into_iter().for_each(|mesh| {
-                        let _ = ui.painter().add(egui::Shape::mesh(mesh));
+                        big_mesh.append(mesh);
                     });
                 });
 
-
+                ui.painter().add(egui::Shape::mesh(big_mesh));
             });
     }
 }
