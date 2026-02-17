@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use eframe::emath::{pos2, Vec2};
 use eframe::epaint::Color32;
 use egui::{Sense, Ui};

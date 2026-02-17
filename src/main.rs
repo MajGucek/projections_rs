@@ -5,7 +5,7 @@ mod udp_reader;
 mod graph;
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::BTreeMap;
 use std::f32::consts::PI;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -16,14 +16,13 @@ use crate::math::raster_lib::math_lib::Shape;
 use eframe::{egui, Frame};
 use eframe::epaint::Color32;
 use eframe::HardwareAcceleration::Preferred;
-use egui::{Context, Mesh, Pos2, Rangef, Sense, Ui, Vec2};
+use egui::{Context, Mesh, Rangef};
 use egui::emath::OrderedFloat;
-use egui::epaint::CircleShape;
 use rand::random;
 use crate::graph::Graph;
 use crate::math::math_lib::Light;
 use crate::ply_parser::PlyObject;
-use crate::rbr::{RbrHeader, Telemetry};
+use crate::rbr::RbrHeader;
 use crate::udp_reader::{udp_start, AppData};
 
 struct App {
@@ -37,6 +36,8 @@ struct App {
 
     last_frame: Instant,
 
+    #[allow(unused)]
+    // This doesn't get read anywhere in App, but it does get read in VirtualSpacePlot!
     focal_length: Rc<RefCell<f32>>,
     zoom: Rc<RefCell<f32>>,
     time: Rc<RefCell<f32>>,
@@ -138,7 +139,7 @@ impl eframe::App for App {
                         ui.colored_label(Color32::RED, rbr_header.error.clone().unwrap());
                         is_valid = false;
                     }
-                    
+
                     ui.add_space(10.);
                     if ui.checkbox(&mut self.reverse_pedal_graph_direction, "Reverse Direction").changed() {
                         self.pedal_graph.reverse_graph_dir();
@@ -182,7 +183,7 @@ struct VirtualSpacePlot {
 }
 
 impl VirtualSpacePlot {
-    pub fn new<'a>(cc: &'a eframe::CreationContext<'a>,
+    pub fn new<'a>(_cc: &'a eframe::CreationContext<'a>,
                    focal_length: Rc<RefCell<f32>>,
                    zoom: Rc<RefCell<f32>>,
                    time: Rc<RefCell<f32>>,
@@ -202,7 +203,7 @@ impl VirtualSpacePlot {
             delta_time
         }
     }
-    pub fn update_state(&mut self, delta_time: f32) {
+    pub fn update_state(&mut self, _delta_time: f32) {
         let speed = PI / 2.;
         let t = *self.time.borrow();
 
@@ -224,7 +225,7 @@ impl VirtualSpacePlot {
 }
 
 impl eframe::App for VirtualSpacePlot {
-    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+    fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
         let dt = *self.delta_time.borrow();
 
         self.update_state(dt);
@@ -239,7 +240,7 @@ impl eframe::App for VirtualSpacePlot {
                 ui.painter().rect_filled(
                     _response.rect,
                     0.0,
-                    egui::Color32::BLACK,
+                    Color32::BLACK,
                 );
 
                 let x_offset = _response.rect.width() / 2.;
@@ -247,7 +248,7 @@ impl eframe::App for VirtualSpacePlot {
                 let focal_length = *self.focal_length.borrow();
                 let zoom = *self.zoom.borrow();
 
-                let mut map: BTreeMap<OrderedFloat<f32>, Vec<egui::Mesh>> = BTreeMap::new();
+                let mut map: BTreeMap<OrderedFloat<f32>, Vec<Mesh>> = BTreeMap::new();
 
                 self.shapes.iter().for_each(|shape| {
                     shape.produce_mesh()

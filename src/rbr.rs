@@ -1,3 +1,4 @@
+#![allow(unused)]
 use serde::Deserialize;
 
 // Telemetry data is ported from the NGP rbr.telemetry.data.TelemetryData.h header

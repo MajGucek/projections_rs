@@ -47,9 +47,9 @@ pub mod math_lib {
         }
         pub fn scale(self, s: f32) -> Self {
             RGB {
-                r: ((self.r as f32 * s).min(255.0).max(0.0)) as u8,
-                g: ((self.g as f32 * s).min(255.0).max(0.0)) as u8,
-                b: ((self.b as f32 * s).min(255.0).max(0.0)) as u8,
+                r: (self.r as f32 * s).min(255.0).max(0.0) as u8,
+                g: (self.g as f32 * s).min(255.0).max(0.0) as u8,
+                b: (self.b as f32 * s).min(255.0).max(0.0) as u8,
             }
         }
 
@@ -161,6 +161,7 @@ pub mod math_lib {
     }
 
     pub trait Shape {
+        #[allow(unused)]
         fn get_color(&self) -> &RGB;
         fn get_vertices(&self) -> &[Vector];
         fn get_transform(&self) -> &Transform;
