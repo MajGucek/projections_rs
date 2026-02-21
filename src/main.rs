@@ -7,6 +7,7 @@ mod graph;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::f32::consts::PI;
+use std::ops::RangeInclusive;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
@@ -19,10 +20,11 @@ use eframe::epaint::{Color32, StrokeKind};
 use eframe::HardwareAcceleration::Preferred;
 use egui::{Context, CornerRadius, Mesh, Rangef, Sense, Stroke, Vec2};
 use egui::emath::OrderedFloat;
+use egui_gauge::Gauge;
 use crate::graph::Graph;
-use crate::math::math_lib::Light;
+use crate::math::math_lib::{Light, ProjectedTriangle};
 use crate::ply_parser::PlyObject;
-use crate::rbr::RbrHeader;
+use crate::rbr::{RbrHeader, Time};
 use crate::udp_reader::{udp_start, AppData};
 
 struct App {
@@ -142,6 +144,15 @@ impl eframe::App for App {
                         is_valid = false;
                     }
 
+                    let rbr_time = if is_valid {
+                        rbr_header.telemetry.get_time()
+                    } else {
+                        Time::default()
+                    };
+                    ui.add_space(10.);
+                    ui.heading("Time");
+                    ui.heading(format!("{:?} : {:?} : {:?}", rbr_time.hours, rbr_time.minutes, rbr_time.seconds));
+
                     ui.add_space(10.);
                     ui.heading("Pedals");
                     if ui.checkbox(&mut self.reverse_pedal_graph_direction, "Reverse Direction").changed() {
@@ -159,7 +170,6 @@ impl eframe::App for App {
                     self.pedal_graph.render(ui, None, 120.);
 
 
-
                     ui.add_space(10.);
                     ui.heading("Steering");
                     egui::Frame::dark_canvas(ui.style())
@@ -172,7 +182,7 @@ impl eframe::App for App {
                                 angle = rbr_header.telemetry.control.steering;
                             }
 
-                            let (_resp, painter)= ui.allocate_painter(Vec2::new(
+                            let (_resp, painter) = ui.allocate_painter(Vec2::new(
                                 ui.available_width(),
                                 200.
                             ), Sense::hover());
@@ -225,17 +235,58 @@ impl eframe::App for App {
                                 StrokeKind::Outside,
                             );
 
-                            todo!("Implement angle calculation and display the rect_filled()!");
+
+                            let max_angle = 1200.0_f32.to_radians();
+                            let normalized = (angle / max_angle).clamp(-1., 1.);
+                            let fill_width = rect_width * normalized.abs();
+                            if normalized < 0.0 {
+                                painter.rect_filled(
+                                    egui::Rect::from_min_max(
+                                        egui::pos2(
+                                            hor_center - fill_width,
+                                            bottom_pos - margin - rect_height,
+                                        ),
+                                        egui::pos2(
+                                            hor_center,
+                                            bottom_pos - margin,
+                                        ),
+                                    ),
+                                    CornerRadius::same(1),
+                                    Color32::GRAY,
+                                );
+                            } else {
+                                painter.rect_filled(
+                                    egui::Rect::from_min_max(
+                                        egui::pos2(
+                                            hor_center,
+                                            bottom_pos - margin - rect_height,
+                                        ),
+                                        egui::pos2(
+                                            hor_center + fill_width,
+                                            bottom_pos - margin,
+                                        ),
+                                    ),
+                                    CornerRadius::same(1),
+                                    Color32::GRAY,
+                                );
+                            }
                         });
+                    });
+
+                /*
+                ui.add(Gauge::new(
+                    20.,
+                    RangeInclusive::new(0., 10_000.),
+                    200.,
+                    egui::ecolor::Color32::GRAY,
+                ));
+
+                 */
 
 
-                });
             });
     }
 }
-
-
-
 
 
 struct VirtualSpacePlot {
@@ -315,28 +366,34 @@ impl eframe::App for VirtualSpacePlot {
                 let focal_length = *self.focal_length.borrow();
                 let zoom = *self.zoom.borrow();
 
-                let mut map: BTreeMap<OrderedFloat<f32>, Vec<Mesh>> = BTreeMap::new();
+                let mut draw_vec: Vec<ProjectedTriangle> = Vec::new();
 
                 self.shapes.iter().for_each(|shape| {
                     shape.produce_mesh()
                         .into_iter()
-                        .filter(|tri_face| tri_face.check_face_culling(focal_length))
                         .for_each(|mut tri_face| {
                             tri_face.calculate_colors(&*self.light.borrow(), *self.ambient_light.borrow_mut());
-                            let (mesh, depth) = tri_face.project_to_screen_space(focal_length, x_offset, y_offset, zoom);
-
-                            map.entry(OrderedFloat::from(depth)).or_default().push(mesh);
+                            let proj_tri = tri_face.project_to_screen_space(focal_length, x_offset, y_offset, zoom);
+                            draw_vec.push(proj_tri);
                         })
                 });
 
-                let mut big_mesh: Mesh = Mesh::default();
-                map.into_iter().for_each(|(_, meshes)| {
-                    meshes.into_iter().for_each(|mesh| {
-                        big_mesh.append(mesh);
-                    });
+                draw_vec.sort_unstable_by(|a, b| {
+                    b.depth
+                        .partial_cmp(&a.depth)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
 
-                ui.painter().add(egui::Shape::mesh(big_mesh));
+
+                let mut mesh: Mesh = Mesh::default();
+                for tri in draw_vec {
+                    let base = mesh.vertices.len() as u32;
+
+                    mesh.vertices.extend(tri.vertices);
+                    mesh.indices.extend([base, base + 1, base + 2]);
+                }
+
+                ui.painter().add(egui::Shape::mesh(mesh));
             });
     }
 }

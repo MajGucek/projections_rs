@@ -67,6 +67,8 @@ pub fn udp_start(state: Arc<ArcSwap<RbrHeader>>, app_data_handle: Arc<ArcSwap<Ap
 }
 
 
+
+
 fn receive_packet(socket: &UdpSocket, buf: &mut [u8; SIZE_OF_TELEMETRY_PACKET]) -> Result<(), String> {
     match socket.recv(buf) {
         Ok(received_size) => {

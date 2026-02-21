@@ -4,6 +4,7 @@ pub mod math_lib {
     
     fn check_vector_culling(focal_length: f32, v: &Vector) -> bool { v.z + focal_length > 1.0 }
     fn check_face_culling(focal_length: f32, face: &TriFace) -> bool {
+
         face.vertices.iter().any(|vector| check_vector_culling(focal_length, vector))
     }
 
@@ -107,24 +108,29 @@ pub mod math_lib {
             }
         }
 
-        pub fn project_to_screen_space(&self, focal_length: f32, x_offset: f32, y_offset: f32, zoom: f32) -> (egui::Mesh, f32) {
-            let mut mesh = egui::Mesh::default();
-            let mut depth_avg = 0.;
-            for i in 0..3 {
-                let (pos2, depth) = project(focal_length, x_offset, y_offset, zoom, &self.vertices[i]);
-                
-                depth_avg += depth;
+        pub fn project_to_screen_space(&self, focal_length: f32, x_offset: f32, y_offset: f32, zoom: f32) -> ProjectedTriangle {
+            let mut depth_sum = 0.;
 
-                mesh.vertices.push(egui::epaint::Vertex {
-                    pos: pos2,
+            let vertices = core::array::from_fn(|i| {
+                let (pos, depth) = project(
+                    focal_length,
+                    x_offset,
+                    y_offset,
+                    zoom,
+                    &self.vertices[i],
+                );
+                depth_sum += depth;
+                egui::epaint::Vertex {
+                    pos,
                     uv: egui::pos2(0., 0.),
-                    color: self.colors[i].into()
-                });
+                    color: self.colors[i].into(),
+                }
+            });
+
+            ProjectedTriangle {
+                depth: depth_sum / 3.,
+                vertices,
             }
-            mesh.indices.extend([0, 1, 2]);
-            
-            depth_avg /= 3.;
-            (mesh, depth_avg)    
         }
 
 
@@ -142,6 +148,12 @@ pub mod math_lib {
                 ).normalize()
             }
         }
+    }
+
+
+    pub struct ProjectedTriangle {
+        pub depth: f32,
+        pub vertices: [egui::epaint::Vertex; 3],
     }
 
 
