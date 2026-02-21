@@ -1,4 +1,5 @@
 pub mod math_lib {
+    use std::ops::Div;
     use egui::Pos2;
     use crate::math::algebraic_objects::algebra_r3::*;
     
@@ -56,20 +57,20 @@ pub mod math_lib {
 
     }
     impl From<Vector> for RGB {
-        fn from(value: Vector) -> RGB {
+        fn from(value: Vector) -> Self {
             RGB {
-                r: (value.x * 255.) as u8,
-                g: (value.y * 255.) as u8,
-                b: (value.z * 255.) as u8,
+                r: (value.x.clamp(0., 1.) * 255.) as u8,
+                g: (value.y.clamp(0., 1.) * 255.) as u8,
+                b: (value.z.clamp(0., 1.) * 255.) as u8,
             }
         }
     }
-    impl Into<Vector> for RGB {
-        fn into(self) -> Vector {
+    impl From<RGB> for Vector {
+        fn from(value: RGB) -> Self {
             Vector {
-                x: self.r as f32 / 255.,
-                y: self.g as f32 / 255.,
-                z: self.b as f32 / 255.,
+                x: (value.r as f32) / 255.,
+                y: (value.g as f32) / 255.,
+                z: (value.b as f32) / 255.,
             }
         }
     }
@@ -79,25 +80,29 @@ pub mod math_lib {
         }
     }
 
+
+
     #[derive(Copy, Clone)]
     pub struct TriFace {
         pub vertices: [Vector; 3],
         pub colors: [RGB; 3],
-        pub normal: Vector,
+        pub normals: [Vector; 3],
     }
     impl TriFace {
         pub fn calculate_colors(&mut self, light: &Light, ambient_light: f32) {
 
             for i in 0..3 {
                 let base = self.colors[i];
+                let base_vec: Vector = Vector::from(base);
 
-                let base_vec: Vector = base.into();
+                let light_dir = light.direction.negate().normalize();
+                let diffuse_intensity = self.normals[i].dot(light_dir).max(0.);
 
-                let diffuse_intensity = self.normal.dot(light.direction).max(0.0);
-                let diffuse = base_vec * diffuse_intensity * light.intensity;
-                let ambient = base_vec * ambient_light;
+                let diffuse = base_vec.scalar_multiply(diffuse_intensity * light.intensity);
+                let ambient = base_vec.scalar_multiply(ambient_light);
 
                 let final_color_vec = diffuse + ambient;
+
                 let final_color = Vector {
                     x: final_color_vec.x.clamp(0.0, 1.0),
                     y: final_color_vec.y.clamp(0.0, 1.0),
@@ -138,17 +143,6 @@ pub mod math_lib {
             check_face_culling(focal_length, &self)
         }
     }
-    impl From<([Vector; 3], RGB)> for TriFace {
-        fn from(value: ([Vector; 3], RGB)) -> Self {
-            Self {
-                vertices: [value.0[0], value.0[1], value.0[2]],
-                colors: [value.1, value.1, value.1],
-                normal: value.0[1].difference(value.0[0]).cross(
-                    value.0[2].difference(value.0[0])
-                ).normalize()
-            }
-        }
-    }
 
 
     pub struct ProjectedTriangle {
@@ -156,6 +150,13 @@ pub mod math_lib {
         pub vertices: [egui::epaint::Vertex; 3],
     }
 
+    pub struct MeshData {
+        pub vertices: Vec<Vector>, // Virtual space vertex positions
+        pub normals: Vec<Vector>, // per vertex normals
+        pub face_indices: Vec<[usize; 3]>, // triangle indexes
+        pub local_origin: Vector,
+        pub base_color: RGB,
+    }
 
     pub struct Light {
         pub direction: Vector,
@@ -173,32 +174,54 @@ pub mod math_lib {
         }
     }
 
+
+
     pub trait Shape {
         #[allow(unused)]
         fn get_color(&self) -> &RGB;
-        fn get_vertices(&self) -> &[Vector];
         fn get_transform(&self) -> &Transform;
+        fn get_mesh_data(&self) -> &MeshData;
+        fn get_local_origin(&self) -> &Vector;
         fn set_transform(&mut self, transform: Transform);
 
-        fn transform_vectors(&self, scale: f32) -> Vec<Vector> {
-            self.get_vertices()
+        fn iter_triangles_transformed(&self, scale: f32) -> Box<dyn Iterator<Item = TriFace> + '_ > {
+            let mesh = self.get_mesh_data();
+            let transform = self.get_transform();
+            let origin = self.get_local_origin();
+
+
+            let transformed_vertices: Vec<Vector> = mesh.vertices
                 .iter()
-                .copied()
-                .map(|vertex| {
-                    self.get_transform().apply_transform(vertex, self.local_origin()) * scale
+                .map(|v| transform.apply_transform(*v, *origin).scalar_multiply(scale))
+                .collect();
+
+            let transformed_normals: Vec<Vector> = mesh.normals
+                .iter()
+                .map(|normal| {
+                    transform.apply_transform(*normal, *origin).normalize()
                 })
-                .collect()
+                .collect();
+
+
+            Box::new(mesh.face_indices.iter().map(move |&[i0, i1, i2]| {
+                TriFace {
+                    vertices: [
+                        transformed_vertices[i0],
+                        transformed_vertices[i1],
+                        transformed_vertices[i2],
+                    ],
+                    colors: [*self.get_color(); 3],
+                    normals: [
+                        transformed_normals[i0],
+                        transformed_normals[i1],
+                        transformed_normals[i2],
+                    ],
+                }
+            }))
+
         }
 
-        fn produce_mesh(&self) -> Vec<TriFace>;
 
-        fn local_origin(&self) -> Vector {
-            Vector {
-                x: 1.0 / (self.get_vertices().len() as f32) * self.get_vertices().iter().fold(0., |acc, vec| acc + vec.x),
-                y: 1.0 / (self.get_vertices().len() as f32) * self.get_vertices().iter().fold(0., |acc, vec| acc + vec.y),
-                z: 1.0 / (self.get_vertices().len() as f32) * self.get_vertices().iter().fold(0., |acc, vec| acc + vec.z),
-            }
-        }
     }
 
 

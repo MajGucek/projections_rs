@@ -22,7 +22,7 @@ use egui::{Context, CornerRadius, Mesh, Rangef, Sense, Stroke, Vec2};
 use egui::emath::OrderedFloat;
 use egui_gauge::Gauge;
 use crate::graph::Graph;
-use crate::math::math_lib::{Light, ProjectedTriangle};
+use crate::math::math_lib::{Light, ProjectedTriangle, TriFace};
 use crate::ply_parser::PlyObject;
 use crate::rbr::{RbrHeader, Time};
 use crate::udp_reader::{udp_start, AppData};
@@ -328,9 +328,9 @@ impl VirtualSpacePlot {
 
         let transformations = vec![
             Transform {
-                translation: Vector::new(t.cos() * speed / 30., 0., 0.),
-                rotation: Quaternion::new_rotation(speed * t, Vector::new(0., 0., 1.)),
-                scale: Vector::new(1., t.sin().abs().max(0.25), 1.)
+                translation: Vector::new(0., 0., 0.),
+                rotation: Quaternion::new_rotation(speed * t, Vector::new(1., 0., 0.)),
+                scale: Vector::new(1., 1., 1.)
             }
         ];
         self.shapes
@@ -366,17 +366,14 @@ impl eframe::App for VirtualSpacePlot {
                 let focal_length = *self.focal_length.borrow();
                 let zoom = *self.zoom.borrow();
 
-                let mut draw_vec: Vec<ProjectedTriangle> = Vec::new();
-
-                self.shapes.iter().for_each(|shape| {
-                    shape.produce_mesh()
-                        .into_iter()
-                        .for_each(|mut tri_face| {
-                            tri_face.calculate_colors(&*self.light.borrow(), *self.ambient_light.borrow_mut());
-                            let proj_tri = tri_face.project_to_screen_space(focal_length, x_offset, y_offset, zoom);
-                            draw_vec.push(proj_tri);
-                        })
-                });
+                let mut draw_vec: Vec<ProjectedTriangle> = self.shapes.iter()
+                    .flat_map(|shape| shape.iter_triangles_transformed(5000.))
+                    .filter(|tri| tri.check_face_culling(focal_length))
+                    .map(|mut tri| {
+                        tri.calculate_colors(&*self.light.borrow(), *self.ambient_light.borrow_mut());
+                        tri.project_to_screen_space(focal_length, x_offset, y_offset, zoom)
+                    }).collect::<Vec<ProjectedTriangle>>();
+                
 
                 draw_vec.sort_unstable_by(|a, b| {
                     b.depth

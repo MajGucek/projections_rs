@@ -1,18 +1,20 @@
 use std::fs::File;
 use std::io::BufReader;
+use std::ops::{AddAssign, Sub};
 use ply_rs::parser::Parser;
 use ply_rs::ply::{DefaultElement, Ply, PropertyAccess};
 use crate::math::algebra_r3::{Transform, Vector};
-use crate::math::math_lib::{Shape, TriFace, RGB};
+use crate::math::math_lib::{MeshData, Shape, TriFace, RGB};
 
 pub struct PlyObject {
-    vertices: Vec<Vector>,
-    face_indices: Vec<[usize; 3]>,
-    color: RGB,
+    mesh_data: MeshData,
+
     transform: Transform,
     #[allow(unused)] // May come in handy?
     file_name: String,
 }
+
+
 
 impl PlyObject {
     pub fn try_load(file_name: String) -> Result<Self, String> {
@@ -30,23 +32,50 @@ impl PlyObject {
             let z = vertex.get_float(&"z".to_owned()).ok_or("No z found!")?;
             vertices.push(Vector { x, y, z} );
         }
+        let vertex_count = vertices.len();
 
         let face_list = ply.payload.get("face").ok_or("no face field in payload")?;
-        let mut faces = Vec::with_capacity(face_list.len());
+        let mut face_indices = Vec::with_capacity(face_list.len());
         for face in face_list {
             let indices = face.get_list_int(&"vertex_indices".to_owned()).ok_or("No vertex_indices found!")?;
             if indices.len() == 3 {
-                faces.push(
+                face_indices.push(
                     [indices[0] as usize, indices[1] as usize, indices[2] as usize]
                 );
             }
         }
 
+        let mut normals = vec![Vector::zero(); vertex_count];
+        for &[i0, i1, i2] in &face_indices {
+            let v0 = vertices[i0];
+            let v1 = vertices[i1];
+            let v2 = vertices[i2];
 
+            let face_normal = (v1 - v0).cross(v2 - v0).normalize();
+
+            normals[i0] += face_normal;
+            normals[i1] += face_normal;
+            normals[i2] += face_normal;
+        }
+
+        for n in &mut normals {
+            *n = n.normalize();
+        }
+
+        let local_origin = Vector {
+            x: 1.0 / (vertex_count as f32) * vertices.iter().fold(0., |acc, vec| acc + vec.x),
+            y: 1.0 / (vertex_count as f32) * vertices.iter().fold(0., |acc, vec| acc + vec.y),
+            z: 1.0 / (vertex_count as f32) * vertices.iter().fold(0., |acc, vec| acc + vec.z),
+        };
+        
         Ok(Self {
-            vertices,
-            face_indices: faces,
-            color: RGB::default(),
+            mesh_data: MeshData {
+                vertices,
+                normals,
+                face_indices,
+                local_origin,
+                base_color: RGB::default(),
+            },
             transform: Transform::default(),
             file_name
         })
@@ -56,28 +85,19 @@ impl PlyObject {
 
 impl Shape for PlyObject {
     fn get_color(&self) -> &RGB {
-        &self.color
-    }
-
-    fn get_vertices(&self) -> &[Vector] {
-        &self.vertices
+        &self.mesh_data.base_color
     }
 
     fn get_transform(&self) -> &Transform {
         &self.transform
     }
+    fn get_mesh_data(&self) -> &MeshData { &self.mesh_data }
+
+    fn get_local_origin(&self) -> &Vector { &self.mesh_data.local_origin }
 
     fn set_transform(&mut self, transform: Transform) {
         self.transform = transform;
     }
 
-    fn produce_mesh(&self) -> Vec<TriFace> {
-        let vertexes = self.transform_vectors(5000.);
-        self.face_indices.iter().map(|indexes| {
-            TriFace::from((
-                [vertexes[indexes[0]], vertexes[indexes[1]], vertexes[indexes[2]]],
-                self.color
-            ))
-        }).collect()
-    }
+
 }

@@ -1,5 +1,5 @@
 pub mod algebra_r3 {
-    use std::ops::{Add, Mul};
+    use std::ops::{Add, AddAssign, Div, Mul, Sub};
 
     #[derive(Copy, Clone)]
     pub struct Transform {
@@ -100,13 +100,36 @@ pub mod algebra_r3 {
             self.translate(other)
         }
     }
-    impl Mul<f32> for Vector {
+    impl Sub for Vector {
         type Output = Vector;
-        fn mul(self, rhs: f32) -> Vector {
-            self.multiply(rhs)
+        fn sub(self, rhs: Self) -> Self::Output { self.difference(rhs) }
+    }
+    impl AddAssign for Vector {
+        fn add_assign(&mut self, rhs: Self) {
+            self.x += rhs.x;
+            self.y += rhs.y;
+            self.z += rhs.z;
+        }
+    }
+    impl Div<f32> for Vector {
+        type Output = Vector;
+
+        fn div(self, rhs: f32) -> Self::Output {
+            Vector {
+                x: self.x / rhs,
+                y: self.y / rhs,
+                z: self.z / rhs,
+            }
         }
     }
     impl Vector {
+        pub fn zero() -> Vector {
+            Vector {
+                x: 0.,
+                y: 0.,
+                z: 0.,
+            }
+        }
         pub fn new(x: f32, y: f32, z: f32) -> Vector {
             Vector {
                 x,
@@ -121,6 +144,7 @@ pub mod algebra_r3 {
                 z: magnitude,
             }
         }
+
         pub fn negate(self) -> Vector {
             Vector { x: -self.x, y: -self.y, z: -self.z }
         }
@@ -141,7 +165,7 @@ pub mod algebra_r3 {
                 z: self.z * s.z
             }
         }
-        pub fn multiply(self, scale: f32) -> Vector {
+        pub fn scalar_multiply(self, scale: f32) -> Vector {
             Vector {
                 x: self.x * scale,
                 y: self.y * scale,
@@ -157,13 +181,13 @@ pub mod algebra_r3 {
             }
         }
         pub fn dot(self, q: Vector) -> f32 {
-            self.x + q.x + self.y + q.y + self.z + q.z
+            (self.x * q.x) + (self.y * q.y) + (self.z * q.z)
         }
 
         pub fn cross(self, q: Vector) -> Vector {
             Vector {
                 x: (self.y * q.z) - (self.z * q.y),
-                y: (self.x * q.z) - (self.z * q.x),
+                y: (self.z * q.x) - (self.x * q.z),
                 z: (self.x * q.y) - (self.y * q.x),
             }
         }
