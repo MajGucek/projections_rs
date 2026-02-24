@@ -12,7 +12,9 @@ struct Function {
     pub point_color: Color32,
     pub point_size: f32,
     pub points: VecDeque<f32>,
-    reverse_direction: bool,
+    pub reverse_direction: bool,
+    pub min_value: f32,
+    pub max_value: f32,
 }
 
 
@@ -22,14 +24,10 @@ impl Graph {
             .corner_radius(egui::CornerRadius::same(2))
             .show(ui, |ui| {
                 let width = width.unwrap_or(ui.available_width());
-                let (response, painter) = ui.allocate_painter(Vec2::new(
-                    width,
-                    height
-                ), Sense::hover());
+                let (response, painter) = ui.allocate_painter(Vec2::new(width, height), Sense::hover());
 
-                let graph_start_absolute_position_y = response.rect.min.y;
-                let graph_start_absolute_position_x = response.rect.min.x;
-
+                let graph_start_y = response.rect.min.y;
+                let graph_start_x = response.rect.min.x;
 
                 self.points.iter().for_each(|function| {
                     function.points.iter().enumerate().for_each(|(index, &p)| {
@@ -39,15 +37,17 @@ impl Graph {
                             index
                         };
 
+                        let normalized = (p - function.min_value) / (function.max_value - function.min_value);
+                        let y = graph_start_y + (1.0 - normalized) * height;
+
                         painter.circle_filled(
                             pos2(
-                                graph_start_absolute_position_x + (x_index as f32 * (width / self.max_points as f32)),
-                                graph_start_absolute_position_y + p,
+                                graph_start_x + x_index as f32 * (width / self.max_points as f32),
+                                y,
                             ),
                             function.point_size,
                             function.point_color,
                         );
-
                     });
                 });
             });
@@ -70,12 +70,14 @@ impl Graph {
         });
     }
 
-    pub fn add_function(&mut self, color: Color32, point_size: f32) {
+    pub fn add_function(&mut self, color: Color32, point_size: f32, min_value: f32, max_value: f32) {
         self.points.push(Function {
             point_color: color,
             point_size,
             points: VecDeque::with_capacity(self.max_points),
             reverse_direction: false,
+            min_value,
+            max_value,
         });
     }
 

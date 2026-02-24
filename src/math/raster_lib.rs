@@ -1,5 +1,4 @@
 pub mod math_lib {
-    use std::ops::Div;
     use egui::Pos2;
     use crate::math::algebraic_objects::algebra_r3::*;
     

@@ -1,5 +1,5 @@
 pub mod algebra_r3 {
-    use std::ops::{Add, AddAssign, Div, Mul, Sub};
+    use std::ops::{Add, AddAssign, Div, Sub};
 
     #[derive(Copy, Clone)]
     pub struct Transform {

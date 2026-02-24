@@ -60,7 +60,7 @@ pub struct Suspension {
 
 #[derive(Deserialize, Default, Copy, Clone)]
 pub struct Engine {
-    pub rpm: f32,
+    pub rpm: f32, // Just .floor() to get i32
     pub radiator_coolant_temperature: f32,
     pub engine_coolant_temperature: f32,
     pub engine_temperature: f32,
@@ -79,7 +79,7 @@ pub struct Motion {
 #[derive(Deserialize, Default, Copy, Clone)]
 pub struct Car {
     pub index: i32,
-    pub speed: f32,
+    pub speed: f32, // [km/s]
     pub position_x: f32,
     pub position_y: f32,
     pub position_z: f32,
@@ -97,12 +97,12 @@ pub struct Car {
 
 #[derive(Deserialize, Default, Copy, Clone)]
 pub struct Control {
-    pub steering: f32,
-    pub throttle: f32,
-    pub brake: f32,
-    pub handbrake: f32,
-    pub clutch: f32,
-    pub gear: i32,
+    pub steering: f32, // [-1.0, 1.0]
+    pub throttle: f32, // [0.0, 100.0]
+    pub brake: f32, // [0.0, 100.0]
+    pub handbrake: f32, // [0.0, 100.0]
+    pub clutch: f32, // [0.0, 100.0]
+    pub gear: i32, // [0, 1, 2, 3, 4, 5, 6]
     pub footbrake_pressure: f32,
     pub handbrake_pressure: f32,
 }
@@ -160,15 +160,16 @@ impl Telemetry {
         self.control.throttle *= 100.0;
         self.control.clutch *= 100.0;
         self.control.gear -= 1;
-        self.car.suspension_lf.wheel.brake_disk.temperature -= KELVIN_TO_C;
-        self.car.suspension_rf.wheel.brake_disk.temperature -= KELVIN_TO_C;
-        self.car.suspension_lb.wheel.brake_disk.temperature -= KELVIN_TO_C;
-        self.car.suspension_rb.wheel.brake_disk.temperature -= KELVIN_TO_C;
-        self.car.suspension_lf.wheel.tire.temperature -= KELVIN_TO_C;
-        self.car.suspension_rf.wheel.tire.temperature -= KELVIN_TO_C;
-        self.car.suspension_lb.wheel.tire.temperature -= KELVIN_TO_C;
-        self.car.suspension_rb.wheel.tire.temperature -= KELVIN_TO_C;
+        //self.car.suspension_lf.wheel.brake_disk.temperature = Self::to_celcius(self.car.suspension_lf.wheel.brake_disk.temperature);
+        //self.car.suspension_rf.wheel.brake_disk.temperature = Self::to_celcius(self.car.suspension_rf.wheel.brake_disk.temperature);
+        //self.car.suspension_lb.wheel.brake_disk.temperature = Self::to_celcius(self.car.suspension_lb.wheel.brake_disk.temperature);
+        //self.car.suspension_rb.wheel.brake_disk.temperature = Self::to_celcius(self.car.suspension_rb.wheel.brake_disk.temperature);
+        //self.car.suspension_lf.wheel.tire.temperature = Self::to_celcius(self.car.suspension_lf.wheel.tire.temperature);
+        //self.car.suspension_rf.wheel.tire.temperature = Self::to_celcius(self.car.suspension_rf.wheel.tire.temperature);
+        //self.car.suspension_lb.wheel.tire.temperature = Self::to_celcius(self.car.suspension_lb.wheel.tire.temperature);
+        //self.car.suspension_rb.wheel.tire.temperature = Self::to_celcius(self.car.suspension_rb.wheel.tire.temperature);
     }
+
 
     pub fn get_time(&self) -> Time {
         // https://www.inchcalculator.com/seconds-to-time-calculator/

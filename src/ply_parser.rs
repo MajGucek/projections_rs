@@ -1,10 +1,9 @@
 use std::fs::File;
 use std::io::BufReader;
-use std::ops::{AddAssign, Sub};
 use ply_rs::parser::Parser;
 use ply_rs::ply::{DefaultElement, Ply, PropertyAccess};
 use crate::math::algebra_r3::{Transform, Vector};
-use crate::math::math_lib::{MeshData, Shape, TriFace, RGB};
+use crate::math::math_lib::{MeshData, Shape, RGB};
 
 pub struct PlyObject {
     mesh_data: MeshData,
@@ -67,7 +66,7 @@ impl PlyObject {
             y: 1.0 / (vertex_count as f32) * vertices.iter().fold(0., |acc, vec| acc + vec.y),
             z: 1.0 / (vertex_count as f32) * vertices.iter().fold(0., |acc, vec| acc + vec.z),
         };
-        
+
         Ok(Self {
             mesh_data: MeshData {
                 vertices,
